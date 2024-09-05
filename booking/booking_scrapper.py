@@ -10,7 +10,8 @@ import threading
 import multiprocessing
 import time, re
 
-def scrape_chunk_of_data(html_content, parent_attr, items_attr, tag_attr, parsed_data, lock, data_name):
+def scrape_chunk_of_data(html_content, parent_attr, items_attr, tag_attr):
+    data = []
     strainer = SoupStrainer('div', attrs=parent_attr)
     soup = BeautifulSoup(html_content, 'lxml', parse_only=strainer)
     parent_box = soup.find('div', attrs=parent_attr)
@@ -18,19 +19,25 @@ def scrape_chunk_of_data(html_content, parent_attr, items_attr, tag_attr, parsed
     for item in parent_items:
         tag = item.find('div', attrs=tag_attr)
         if tag and tag.string:
-            with lock:
-                parsed_data[data_name].append(tag.string)
+            # with lock:
+            data.append(tag.string)
+            # parsed_data[data_name].append(tag.string)
+    return data
 
 class BookingScrapper:
 
-    def __init__(self, selenium_web_driver:WebDriver, url):
+    def __init__(self, selenium_web_driver:WebDriver):
         self.selenium_web_driver = selenium_web_driver
-        self.url = url
 
     def pull_data(self):
         return self.parse_data()
     
-    def parse_data(self):
+    def get_specific_data(self, btn_locator, el_locator):
+        self.try_expanding_list(locator=btn_locator)
+        html_content = self.selenium_web_driver.page_source  
+        return scrape_chunk_of_data(html_content, el_locator['parent_attr'], el_locator['items_attr'], el_locator['tag_attr'])
+    
+    def scrape_all_data(self):
         # Try to expand every box that is possible to have all the data to scrape
         neighborhood_btn_locator = (By.CSS_SELECTOR, 'div[data-filters-group="di"] > button')
         hotel_facility_btn_locator = (By.CSS_SELECTOR, 'div[data-filters-group="hotelfacility"] > button')

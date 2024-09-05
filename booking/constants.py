@@ -72,4 +72,11 @@ DATA_TO_BE_SCRAPPED = [
     }
 ]
 
+FILTERS_TO_APPLY = [
+    "Neighborhood",
+    "Hotel Facilities",
+    "Room Facilities",
+    "Properties",
+]
+
 

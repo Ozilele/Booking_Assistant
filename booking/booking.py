@@ -23,6 +23,8 @@ class Booking(webdriver.Chrome):
         self.delete_all_cookies()
         self.implicitly_wait(15)
         self.maximize_window()
+        self.scrapper = BookingScrapper(self)
+        self.filtration_obj = BookingFiltration(self)
 
     def __exit__(self, exc_type, exc, traceback):
         if self.teardown:
@@ -144,10 +146,28 @@ class Booking(webdriver.Chrome):
             label_pets_el.click()
         search_btn_element = self.find_element(By.XPATH, '//*[@id="indexsearch"]/div[2]/div/form/div[1]/div[4]/button')
         search_btn_element.click() # click search btn
-        # Run scrapper to get data about the possible filters specific to place, like facilities, neighborhood etc. for user to then apply in the program
         self.wait_for_results()
-        return self.scrape_data() # Run scrapper to get some data
     
+    def apply_filtration(self, **kwargs):
+        filtration_methods = {
+            'sort_by': lambda value: self.filtration_obj.apply_sorting(value),
+            'bedrooms': lambda value: self.filtration_obj.apply_bedrooms_and_bathrooms_count(
+                bedrooms=value, 
+                bathrooms=kwargs.get('bathrooms') 
+            ),
+            'neighborhood': lambda value: self.filtration_obj.apply_neighborhood(value),
+            'hotel_facilities': lambda value: self.filtration_obj.apply_hotel_facilities(value),
+            'room_facilities': lambda value: self.filtration_obj.apply_room_facilities(value),
+            'properties': lambda value: self.filtration_obj.apply_properties(value),
+            'budget_range': lambda value: self.filtration_obj.adjust_budget(value)
+        }
+        for key, values in kwargs.items():
+            if key in filtration_methods:
+                filtration_methods[key](values)
+            elif key == 'bathrooms':
+                self.filtration_obj.apply_bedrooms_and_bathrooms_count(bedrooms=kwargs.get('bedrooms'), bathrooms=values)
+            self.wait_for_results()
+
     def apply_filtrations(self, *stars, **kwargs):
         filtration = BookingFiltration(web_driver=self)
         filtration.apply_star_rating(*stars)
@@ -170,15 +190,6 @@ class Booking(webdriver.Chrome):
                 self.wait_for_results()
             elif key == 'bathrooms':
                 filtration.apply_bedrooms_and_bathrooms_count(bedrooms=kwargs.get('bedrooms'), bathrooms=value)
-        # if 'sort_by' in kwargs:
-        #     filtration.apply_sorting(kwargs['sort_by'].value)
-        #     self.wait_for_results()
-        # if 'bedrooms' in kwargs or 'bathrooms' in kwargs:
-        #     filtration.apply_bedrooms_and_bathrooms_count(
-        #         bedrooms=kwargs.get('bedrooms'), 
-        #         bathrooms=kwargs.get('bathrooms') 
-        #     )
-        #     self.wait_for_results()
 
     def report_data(self):
         hotels_box = WebDriverWait(self, 3).until(
@@ -188,7 +199,6 @@ class Booking(webdriver.Chrome):
         # Create report with all the data
         report_data = []
         report_discounts = []
-
         data_lock = threading.Lock()
         report_data_threads = []
         deals_per_thread = 12
@@ -208,7 +218,6 @@ class Booking(webdriver.Chrome):
             t.join()
         for t in report_discounts_threads:
             t.join()
-
         print(f"Length of results: {len(report_data)}")
         report_data_table = PrettyTable(
             field_names=["Hotel Name", "Hotel Price", "Hotel Score"]
@@ -224,15 +233,17 @@ class Booking(webdriver.Chrome):
         report_discounts_table.align["Hotel Name"] = "l"
         print(report_discounts_table)
 
-    def scrape_data(self):
-        scrapper = BookingScrapper(self, self.current_url)
-        scrapped_data = scrapper.pull_data()
+    def scrape_data(self, obj):
+        # scrapper = BookingScrapper(self)
+        # scrapped_data = self.scrapper.pull_data()
+        btn_locator = (By.CSS_SELECTOR, f'div[data-filters-group="{obj['parent_attr']['data-filters-group']}"] > button')
+        scrapped_data = self.scrapper.get_specific_data(btn_locator, obj)
         return scrapped_data
     
     def wait_for_results(self):
         try:
             self.implicitly_wait(0)
-            WebDriverWait(self, 12).until(
+            WebDriverWait(self, 10).until(
                 EC.invisibility_of_element(
                     (By.CSS_SELECTOR, 'div[data-testid="skeleton-loader"]')
                 )

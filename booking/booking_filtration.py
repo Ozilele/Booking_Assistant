@@ -5,6 +5,7 @@ from selenium.webdriver.support.wait import WebDriverWait
 from selenium.webdriver.common.action_chains import ActionChains
 from selenium.webdriver.support import expected_conditions as EC
 from selenium.common.exceptions import TimeoutException
+import time
 
 class BookingFiltration:
 
@@ -31,17 +32,7 @@ class BookingFiltration:
             )
             if not filter_el.is_selected():
                 filter_el.click()
-                try:
-                    WebDriverWait(self.web_driver, 15).until(
-                        EC.presence_of_element_located(
-                            (By.CSS_SELECTOR, 'div[data-testid="skeleton-loader"]')
-                        )
-                    )
-                    print(f"Skeleton loader appeared after selecting {star_val} star filter")
-                except TimeoutException: 
-                    print('Unable to wait for all the results')
-                except Exception as e:
-                    print(f'Error occurred: {str(e)}')
+                self.await_results()
 
     # 1 sort type available at a time
     def apply_sorting(self, sort_type):
@@ -68,32 +59,50 @@ class BookingFiltration:
     def apply_neighborhood(self, places):
         for place in places:
             try:
-                element = self.web_driver.find_element(By.CSS_SELECTOR, 'div[data-filters-group="di"]').find_element(By.XPATH, f'./div[text()="{place}"]')
+                element = self.web_driver.find_element(By.CSS_SELECTOR, 'div[data-filters-group="di"]').find_element(By.XPATH, f'.//div[text()="{place}"]')
                 element.click()
+                self.await_results()
             except Exception as e:
                 print(e.__str__)
 
     def apply_hotel_facilities(self, facilities):
         for facility in facilities:
             try:
-                print(f'Facility is {facility}')
+                element = self.web_driver.find_element(By.CSS_SELECTOR, 'div[data-filters-group="hotelfacility"]').find_element(By.XPATH, f'.//div[text()="{facility}"]')
+                element.click()
+                self.await_results()
             except Exception as e: 
-                print(f'No such facility found...')
+                print(e.__str__)
 
     def apply_room_facilities(self, facilities):
         for room_facility in facilities:
             try:
-                print(f'Room_facility is {room_facility}')
+                element = self.web_driver.find_element(By.CSS_SELECTOR, 'div[data-filters-group="roomfacility"]').find_element(By.XPATH, f'.//div[text()="{room_facility}"]')
+                element.click()
+                self.await_results()
             except Exception as e:
-                print(f'LOOOL')
+                print(e.__str__)
 
     def apply_properties(self, properties):
         for property in properties:
             try:
-                print(f'Given property is {property}')
+                element = self.web_driver.find_element(By.CSS_SELECTOR, 'div[data-filters-group="ht_id"]').find_element(By.XPATH, f'.//div[text()="{property}"]')
+                element.click()
+                self.await_results()
             except Exception as e:
                 print(e.__str__)
 
     def adjust_budget(self, range):
-        print(range)
+        pass
+
+    def await_results(self):
+        try:
+            skeleton_loader_locator = (By.CSS_SELECTOR, 'div[data-testid="skeleton-loader"]')
+            WebDriverWait(self.web_driver, 10).until(
+                EC.presence_of_element_located(skeleton_loader_locator)
+            )
+        except TimeoutException: 
+            print('Unable to wait for all the results')
+        except Exception as e:
+            print(f'Error occurred: {str(e)}')
     
