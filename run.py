@@ -2,7 +2,7 @@ import time
 import datetime
 from booking.booking import Booking
 from selenium.webdriver.chrome.options import Options
-from booking.constants import SortingOptions, validate_date
+from booking.constants import SortingOptions, validate_date, FILTERS_TO_APPLY, DATA_TO_BE_SCRAPPED
 from InquirerPy import inquirer
 
 chrome_options = Options()
@@ -56,28 +56,47 @@ if __name__ == "__main__":
                 mandatory=True,
                 mandatory_message="Type (y/Y) if yes or (n/N) if no)."
             ).execute()
-            search_results_data = bot.select_adults(adults=adults_nr, children=children_nr, children_ages=tuple(children_age), rooms=rooms, withPets=with_Pets)
-            applied_filters = dict() 
-            # neigh-25, room-25, property_type-8(size dostosowuje sie do wyszukiwania), hotel_fac-14(size dostosowuje sie do wyszukiwania)
-            for key, values in search_results_data.items():
-                if '_' in key:
-                    words = key.split('_')
-                    filter_option = ' '.join(word.capitalize() for word in words)
+            bot.select_adults(adults=adults_nr, children=children_nr, children_ages=tuple(children_age), rooms=rooms, withPets=with_Pets)
+
+            while True:
+                filter_option = inquirer.select(
+                    message="Select filter option you want to apply (or press Escape to skip)",
+                    choices=FILTERS_TO_APPLY,
+                    default=None,
+                    vi_mode=True,
+                    mandatory=False,
+                    multiselect=False,
+                    keybindings={"skip": [{"key": "escape"}]}
+                ).execute()
+                if filter_option is None or filter_option == []: # No filter option selected
+                    break
+                if " " in filter_option:
+                    parts = filter_option.split(" ")
+                    filter_option_key = '_'.join([part.lower() for part in parts])
                 else:
-                    filter_option = key.capitalize()
+                    filter_option_key = filter_option.lower()
+                obj = None
+                for elem in DATA_TO_BE_SCRAPPED:
+                    if elem['data_name'] == filter_option_key:
+                        obj = elem
+                scrapped_data = bot.scrape_data(obj)
                 answers = inquirer.checkbox(
-                    message=f"Select {filter_option} you're interested in (or press Escape to skip):",
-                    choices=values,
+                    message=f"Select {filter_option} you're interested in(toggle choice by pressing space or press Escape to skip)",
+                    choices=scrapped_data,
                     transformer=lambda result: ", ".join(result),
                     validate=lambda answer: True,
                     vi_mode=True,
                     mandatory=False,
                     keybindings={"skip": [{"key": "escape"}]},
                 ).execute()
-                applied_filters[key] = answers
-            print(f'Applied filters are {applied_filters}')
+                if answers is None or answers == []: # No choice selected
+                    continue
+                bot.apply_filtration(**{filter_option_key: answers})
+                FILTERS_TO_APPLY.remove(filter_option)
+                if len(FILTERS_TO_APPLY) == 0:
+                    break
             sort_option = inquirer.rawlist(
-                message="Select your sort option (or press Escape to skip):",
+                message="Select sorting option (or press Escape to skip):",
                 choices = [
                     SortingOptions.TOP_PICKS_FAMILIES.value,
                     SortingOptions.HOMES_APARTMENTS_FIRST.value,
@@ -96,12 +115,13 @@ if __name__ == "__main__":
                 mandatory=False,
                 keybindings={"skip": [{"key": "escape"}]}
             ).execute()
-            print(f'Sort option is {sort_option}')
-            bot.apply_filtrations(3, 4, 5, sort_by=sort_option, **applied_filters) # basic filtrations
-            time.sleep(1)
-            bot.refresh()
-            bot.wait_for_results() # Wait for all the results
+            if sort_option is not None:
+                bot.apply_filtration(sort_by=sort_option)
+            # time.sleep(1)
+            # bot.refresh()
+            # bot.wait_for_results() # Wait for all the results
             # bot.report_data() # Report data about properties
     except Exception as e:
+        print(f'Error msg: {e.__str__}')
         print("There is a problem running this program from command line interface")
 
