@@ -155,6 +155,7 @@ class Booking(webdriver.Chrome):
                 bedrooms=value, 
                 bathrooms=kwargs.get('bathrooms') 
             ),
+            'property_stars': lambda values: self.filtration_obj.apply_star_rating(*values),
             'neighborhood': lambda value: self.filtration_obj.apply_neighborhood(value),
             'hotel_facilities': lambda value: self.filtration_obj.apply_hotel_facilities(value),
             'room_facilities': lambda value: self.filtration_obj.apply_room_facilities(value),
@@ -234,10 +235,9 @@ class Booking(webdriver.Chrome):
         print(report_discounts_table)
 
     def scrape_data(self, obj):
-        # scrapper = BookingScrapper(self)
-        # scrapped_data = self.scrapper.pull_data()
-        btn_locator = (By.CSS_SELECTOR, f'div[data-filters-group="{obj['parent_attr']['data-filters-group']}"] > button')
-        scrapped_data = self.scrapper.get_specific_data(btn_locator, obj)
+        if obj['data_name'] == "budget_range":
+            return self.scrapper.get_property_price_range()
+        scrapped_data = self.scrapper.get_specific_data(obj)
         return scrapped_data
     
     def wait_for_results(self):

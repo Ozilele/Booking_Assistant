@@ -12,7 +12,6 @@ class BookingFiltration:
     def __init__(self, web_driver:WebDriver):
         self.web_driver = web_driver
 
-    # stars = from 0 to 5
     def apply_star_rating(self, *star_values):
         actions = ActionChains(self.web_driver)
         star_box = WebDriverWait(self.web_driver, 10).until(

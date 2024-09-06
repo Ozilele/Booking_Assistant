@@ -10,12 +10,18 @@ import threading
 import multiprocessing
 import time, re
 
-def scrape_chunk_of_data(html_content, parent_attr, items_attr, tag_attr):
+def scrape_chunk_of_data(html_content, parent_attr, items_attr, tag_attr, data_name):
     data = []
     strainer = SoupStrainer('div', attrs=parent_attr)
     soup = BeautifulSoup(html_content, 'lxml', parse_only=strainer)
     parent_box = soup.find('div', attrs=parent_attr)
     parent_items = parent_box.find_all('div', attrs=items_attr)
+    if data_name == "property_stars":
+        stars_values = []
+        for item in parent_items:
+            star_value = re.sub(r'[^\d]', '', item.get('data-filters-item'))
+            stars_values.append(star_value)
+        return stars_values
     for item in parent_items:
         tag = item.find('div', attrs=tag_attr)
         if tag and tag.string:
@@ -32,11 +38,23 @@ class BookingScrapper:
     def pull_data(self):
         return self.parse_data()
     
-    def get_specific_data(self, btn_locator, el_locator):
-        self.try_expanding_list(locator=btn_locator)
+    def get_specific_data(self, el_locator):
+        if el_locator['btn_locator'] is not None:
+            self.try_expanding_list(locator=el_locator['btn_locator'])
         html_content = self.selenium_web_driver.page_source  
-        return scrape_chunk_of_data(html_content, el_locator['parent_attr'], el_locator['items_attr'], el_locator['tag_attr'])
+        return scrape_chunk_of_data(html_content, el_locator['parent_attr'], el_locator['items_attr'], el_locator['tag_attr'], el_locator['data_name'])
     
+    def get_property_price_range(self):
+        budget_per_night_range_locator = (By.CSS_SELECTOR, 'div[data-filters-group="price"] > div[data-testid="filters-group-slider"] > span > div')
+        budget_per_night_range_txt = self.selenium_web_driver.find_element(*budget_per_night_range_locator).text.strip()
+        bounds = budget_per_night_range_txt.replace(' ', '').replace("\u2013", "-").split("-")
+        lower_bound = int(re.sub(r'[^\d,]', '', bounds[0]).replace(',', ''))
+        upper_bound = int(re.sub(r'[^\d,]', '', bounds[1]).replace(',', ''))
+        return {
+            'lower_range': lower_bound,
+            'upper_range': upper_bound
+        }
+
     def scrape_all_data(self):
         # Try to expand every box that is possible to have all the data to scrape
         neighborhood_btn_locator = (By.CSS_SELECTOR, 'div[data-filters-group="di"] > button')
@@ -48,7 +66,6 @@ class BookingScrapper:
         bounds = budget_per_night_range_txt.replace(' ', '').replace("\u2013", "-").split("-")
         lower_bound = re.sub(r'[^\d,]', '', bounds[0])
         upper_bound = re.sub(r'[^\d,+]', '', bounds[1])
-        print(f'Lower bound is {lower_bound}, upper_bound is {upper_bound}')
         locators = [neighborhood_btn_locator, hotel_facility_btn_locator, room_facility_btn_locator, property_btn_locator]
         locator_threads = []
 

@@ -2,7 +2,7 @@ import time
 import datetime
 from booking.booking import Booking
 from selenium.webdriver.chrome.options import Options
-from booking.constants import SortingOptions, validate_date, FILTERS_TO_APPLY, DATA_TO_BE_SCRAPPED
+from booking.constants import SortingOptions, validate_date, validate_budget, FILTERS_TO_APPLY, DATA_TO_BE_SCRAPPED
 from InquirerPy import inquirer
 
 chrome_options = Options()
@@ -80,18 +80,46 @@ if __name__ == "__main__":
                     if elem['data_name'] == filter_option_key:
                         obj = elem
                 scrapped_data = bot.scrape_data(obj)
-                answers = inquirer.checkbox(
-                    message=f"Select {filter_option} you're interested in(toggle choice by pressing space or press Escape to skip)",
-                    choices=scrapped_data,
-                    transformer=lambda result: ", ".join(result),
-                    validate=lambda answer: True,
-                    vi_mode=True,
-                    mandatory=False,
-                    keybindings={"skip": [{"key": "escape"}]},
-                ).execute()
-                if answers is None or answers == []: # No choice selected
-                    continue
-                bot.apply_filtration(**{filter_option_key: answers})
+                answers = []
+                if obj['data_name'] != "budget_range":    
+                    answers = inquirer.checkbox(
+                        message=f"Select {filter_option} you're interested in(toggle choice by pressing space or press Escape to skip)",
+                        choices=scrapped_data,
+                        transformer=lambda result: ", ".join(result),
+                        validate=lambda answer: True,
+                        vi_mode=True,
+                        mandatory=False,
+                        keybindings={"skip": [{"key": "escape"}]},
+                    ).execute()
+                    if answers is None or answers == []: # No choice selected
+                        continue
+                    bot.apply_filtration(**{filter_option_key: answers})
+                else:
+                    lower_bound = None
+                    upper_bound = None
+                    for key, bound in scrapped_data.items():
+                        txt = key.split('_')[0]
+                        if txt == "lower":
+                            isLower = True
+                        else:
+                            isLower = False
+                        value = inquirer.number(
+                            message=f"Enter {txt} bound for budget per night you want to spend(or press Escape to skip)",
+                            default=None,
+                            min_allowed=scrapped_data['lower_range'],
+                            max_allowed=scrapped_data['upper_range'],
+                            vi_mode=True,
+                            mandatory=False,
+                            keybindings={"skip": [{"key": "escape"}]},
+                            validate=lambda result: validate_budget(result, scrapped_data['lower_range'], scrapped_data['upper_range'], isLower),
+                        ).execute()
+                        if txt == "lower":
+                            lower_bound = value
+                        else:
+                            upper_bound = value
+                    if lower_bound is None and upper_bound is None:
+                        continue
+                    print(f'Lower: {lower_bound}, upper: {upper_bound}')
                 FILTERS_TO_APPLY.remove(filter_option)
                 if len(FILTERS_TO_APPLY) == 0:
                     break
